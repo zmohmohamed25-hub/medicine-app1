@@ -33,17 +33,18 @@ jobs:
               ['POST_NOTIFICATIONS','SCHEDULE_EXACT_ALARM','USE_FULL_SCREEN_INTENT','WAKE_LOCK','RECEIVE_BOOT_COMPLETED','VIBRATE'])
           s = s.replace('<application', perms + '    <application', 1)
           s = s.replace('<activity', '<activity android:showWhenLocked="true" android:turnScreenOn="true"', 1)
-          recv = '''
-        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
-        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
-            </intent-filter>
-        </receiver>
-    '''
+          recv = (
+              '    <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />\n'
+              '    <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">\n'
+              '        <intent-filter>\n'
+              '            <action android:name="android.intent.action.BOOT_COMPLETED"/>\n'
+              '            <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>\n'
+              '            <action android:name="android.intent.action.QUICKBOOT_POWERON"/>\n'
+              '            <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>\n'
+              '        </intent-filter>\n'
+              '    </receiver>\n'
+              '    '
+          )
           s = s.replace('</application>', recv + '</application>', 1)
           open(mp, 'w', encoding='utf-8').write(s)
           # ---- Gradle: core library desugaring ----
