@@ -1,0 +1,71 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Create Android project
+        run: flutter create --platforms=android --project-name medicine_app build_app
+      - name: Copy app code
+        run: |
+          cp app_src/main.dart build_app/lib/main.dart
+          cp app_src/pubspec.yaml build_app/pubspec.yaml
+      - name: Patch Android (permissions, full-screen, desugaring)
+        run: |
+          python3 - <<'EOF'
+          import re, os
+          base = 'build_app/android/app'
+          # ---- Manifest ----
+          mp = base + '/src/main/AndroidManifest.xml'
+          s = open(mp, encoding='utf-8').read()
+          perms = ''.join('    <uses-permission android:name="android.permission.%s"/>\n' % p for p in
+              ['POST_NOTIFICATIONS','SCHEDULE_EXACT_ALARM','USE_FULL_SCREEN_INTENT','WAKE_LOCK','RECEIVE_BOOT_COMPLETED','VIBRATE'])
+          s = s.replace('<application', perms + '    <application', 1)
+          s = s.replace('<activity', '<activity android:showWhenLocked="true" android:turnScreenOn="true"', 1)
+          recv = '''
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+    '''
+          s = s.replace('</application>', recv + '</application>', 1)
+          open(mp, 'w', encoding='utf-8').write(s)
+          # ---- Gradle: core library desugaring ----
+          for name in ['build.gradle.kts', 'build.gradle']:
+              gp = base + '/' + name
+              if not os.path.exists(gp):
+                  continue
+              g = open(gp, encoding='utf-8').read()
+              if name.endswith('.kts'):
+                  g = re.sub(r'compileOptions\s*\{', 'compileOptions {\n        isCoreLibraryDesugaringEnabled = true', g, 1)
+                  g += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n'
+              else:
+                  g = re.sub(r'compileOptions\s*\{', 'compileOptions {\n        coreLibraryDesugaringEnabled true', g, 1)
+                  g += '\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"\n}\n'
+              open(gp, 'w', encoding='utf-8').write(g)
+          EOF
+      - name: Build
+        working-directory: build_app
+        run: |
+          flutter pub get
+          flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: medicine-apk
+          path: build_app/build/app/outputs/flutter-apk/app-release.apk
