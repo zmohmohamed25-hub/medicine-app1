@@ -61,6 +61,22 @@ jobs:
                   g += '\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"\n}\n'
               open(gp, 'w', encoding='utf-8').write(g)
           EOF
+      - name: Force compileSdk 36 for all plugins
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/force-sdk.gradle <<'EOF'
+          allprojects {
+              afterEvaluate { p ->
+                  if (p.hasProperty('android')) {
+                      try {
+                          p.android.compileSdk = 36
+                      } catch (Throwable t) {
+                          p.android.compileSdkVersion(36)
+                      }
+                  }
+              }
+          }
+          EOF
       - name: Build
         working-directory: build_app
         run: |
